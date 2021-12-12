@@ -1,0 +1,11 @@
+version: '3.3'
+services:
+  box1:
+    image: net-box:demo
+    command:
+      /bin/sh -c "while true;do sleep 3600;done"
+  box2:
+    image: net-box:demo
+    command:
+      /bin/sh -c "while true;do sleep 3600;done"
+  
