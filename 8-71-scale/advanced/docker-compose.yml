@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  flask:
+    build:
+      context: ./flask
+      dockerfile: Dockerfile
+    image: flask-demo:latest
+    environment:
+      - REDIS_HOST=redis-server
+    networks:
+      - backend
+      - frontend
+
+  redis-server:
+    image: redis:latest
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - 8000:80
+      # 设定将本机的8000端口，映射给nginx的80
+    depends_on:
+      - flask
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # 通过volume，将本地的设定文件映射到容器中
+      - ./var/log/nginx:/var/log/nginx
+      # 通过volume，同时也将容器中的log映射出来，方便查看
+    networks:
+      - frontend
+
+networks:
+# 这里定义了两个网络，有点类似实际的生产实践
+  backend:
+  # back-end包含的是redis DB和flask的App服务
+  frontend:
+  # front-end包含web服务的nginx和flask的App服务
