@@ -1,0 +1,27 @@
+version: '3.3'
+services:
+  box1:
+    image: net-box:demo
+    command:
+      /bin/sh -c "while true;do sleep 3600;done"
+    networks:
+      - my-net-work-1
+  box2:
+    image: net-box:demo
+    command:
+      /bin/sh -c "while true;do sleep 3600;done"
+    networks:
+      - my-net-work-1
+      - my-net-work-2
+
+networks:
+  my-net-work-1:
+  my-net-work-2:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
+# 基本上compose文件里可以写的和networ命令创建的一样
+# 各种各样的参数,都可以选择
