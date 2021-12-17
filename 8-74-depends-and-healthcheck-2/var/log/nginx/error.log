@@ -1,0 +1,54 @@
+2021/12/16 06:52:17 [notice] 1#1: using the "epoll" event method
+2021/12/16 06:52:17 [notice] 1#1: nginx/1.20.2
+2021/12/16 06:52:17 [notice] 1#1: built by gcc 10.3.1 20210424 (Alpine 10.3.1_git20210424) 
+2021/12/16 06:52:17 [notice] 1#1: OS: Linux 5.10.76-linuxkit
+2021/12/16 06:52:17 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+2021/12/16 06:52:17 [notice] 1#1: start worker processes
+2021/12/16 06:52:17 [notice] 1#1: start worker process 24
+2021/12/16 06:52:17 [notice] 1#1: start worker process 25
+2021/12/16 06:52:17 [notice] 1#1: start worker process 26
+2021/12/16 06:52:17 [notice] 1#1: start worker process 27
+2021/12/16 06:52:33 [notice] 1#1: signal 3 (SIGQUIT) received, shutting down
+2021/12/16 06:52:33 [notice] 25#25: gracefully shutting down
+2021/12/16 06:52:33 [notice] 24#24: gracefully shutting down
+2021/12/16 06:52:33 [notice] 27#27: gracefully shutting down
+2021/12/16 06:52:33 [notice] 26#26: gracefully shutting down
+2021/12/16 06:52:33 [notice] 25#25: exiting
+2021/12/16 06:52:33 [notice] 24#24: exiting
+2021/12/16 06:52:33 [notice] 27#27: exiting
+2021/12/16 06:52:33 [notice] 26#26: exiting
+2021/12/16 06:52:33 [notice] 25#25: exit
+2021/12/16 06:52:33 [notice] 24#24: exit
+2021/12/16 06:52:33 [notice] 27#27: exit
+2021/12/16 06:52:33 [notice] 26#26: exit
+2021/12/16 06:52:33 [notice] 1#1: signal 17 (SIGCHLD) received from 24
+2021/12/16 06:52:33 [notice] 1#1: worker process 24 exited with code 0
+2021/12/16 06:52:33 [notice] 1#1: signal 29 (SIGIO) received
+2021/12/16 06:52:33 [notice] 1#1: signal 17 (SIGCHLD) received from 25
+2021/12/16 06:52:33 [notice] 1#1: worker process 25 exited with code 0
+2021/12/16 06:52:33 [notice] 1#1: worker process 26 exited with code 0
+2021/12/16 06:52:33 [notice] 1#1: worker process 27 exited with code 0
+2021/12/16 06:52:33 [notice] 1#1: exit
+2021/12/16 06:56:56 [notice] 1#1: using the "epoll" event method
+2021/12/16 06:56:56 [notice] 1#1: nginx/1.20.2
+2021/12/16 06:56:56 [notice] 1#1: built by gcc 10.3.1 20210424 (Alpine 10.3.1_git20210424) 
+2021/12/16 06:56:56 [notice] 1#1: OS: Linux 5.10.76-linuxkit
+2021/12/16 06:56:56 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1048576:1048576
+2021/12/16 06:56:56 [notice] 1#1: start worker processes
+2021/12/16 06:56:56 [notice] 1#1: start worker process 23
+2021/12/16 06:56:56 [notice] 1#1: start worker process 24
+2021/12/16 06:56:56 [notice] 1#1: start worker process 25
+2021/12/16 06:56:56 [notice] 1#1: start worker process 26
+2021/12/16 08:12:50 [notice] 23#23: signal 15 (SIGTERM) received, exiting
+2021/12/16 08:12:50 [notice] 23#23: exiting
+2021/12/16 08:12:50 [notice] 24#24: signal 15 (SIGTERM) received, exiting
+2021/12/16 08:12:50 [notice] 24#24: exiting
+2021/12/16 08:12:50 [notice] 26#26: signal 15 (SIGTERM) received, exiting
+2021/12/16 08:12:50 [notice] 26#26: exiting
+2021/12/16 08:12:50 [notice] 1#1: signal 15 (SIGTERM) received, exiting
+2021/12/16 08:12:50 [notice] 25#25: signal 15 (SIGTERM) received, exiting
+2021/12/16 08:12:50 [notice] 23#23: exit
+2021/12/16 08:12:50 [notice] 24#24: exit
+2021/12/16 08:12:50 [notice] 26#26: exit
+2021/12/16 08:12:50 [notice] 25#25: exiting
+2021/12/16 08:12:50 [notice] 25#25: exit
