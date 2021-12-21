@@ -1,0 +1,27 @@
+docker compose 投票 app 练习
+源码地址： https://github.com/dockersamples/example-voting-app
+
+概要（github上的说明也有写）
+
+投票画面
+    python
+
+    ↓
+
+投票结果缓存
+    redis
+
+    ↓
+
+将缓存结果转移到DB（batch）
+    .Net
+
+    ↓
+
+保存缓存结果的数据库
+    PostgreSQL
+
+    ↓
+
+展示所有投票的所有结果
+    Node.js
