@@ -1,0 +1,33 @@
+关于多节点之间的网络连接，swarm直接是使用的docker的命令
+
+但是我们会使用之前并没有使用过的dirve，就是overlay这个类型
+
+想要创建网络，就和docker创建网络一样
+    docker network create -d overlay my-swarm-net
+        注意 -d 的时候我们使用了overlay
+
+在cluster的中创建了overlay的网络后
+    在该网络中启动服务，且服务的replica在work节点中启动时
+    worker节点中会自动的创建该overlay的网络
+
+启动一个服务，使用--network来指overlay网络
+    docker service create --network mynet --name test --replicas 2 busybox ping 8.8.8.8
+
+在容器中运行 ip 命令，可以看到两个网络
+    $ docker exec -it 2bc sh
+    / # ip a
+    1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue qlen 1
+        link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+        inet 127.0.0.1/8 scope host lo
+        valid_lft forever preferred_lft forever
+    90: eth0@if91: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1450 qdisc noqueue
+        link/ether 02:42:0a:00:01:5b brd ff:ff:ff:ff:ff:ff
+        inet 10.0.1.91/24 brd 10.0.1.255 scope global eth0
+        valid_lft forever preferred_lft forever
+    92: eth1@if93: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 qdisc noqueue
+        link/ether 02:42:ac:13:00:03 brd ff:ff:ff:ff:ff:ff
+        inet 172.19.0.3/16 brd 172.19.255.255 scope global eth1
+        valid_lft forever preferred_lft forever
+        
+
+

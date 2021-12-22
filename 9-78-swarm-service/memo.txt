@@ -1,0 +1,91 @@
+和docker compose类似，swarm也是以service为单位启动容器
+但不同的是，swarm会自动帮我们调度，在某一个node上创建这个容器
+直接用命令行 docker service create 即可创建service
+    Usage:  docker service create [OPTIONS] IMAGE [COMMAND] [ARG...]
+    参数可以参见 --help 
+    例如：
+        C:\>docker service create nginx:latest
+        overall progress: 1 out of 1 tasks
+
+            1/1: running   [==================================================>]
+
+                verify: Service converged
+    可以看到nginx使用默认设定，启动
+
+使用 docker service ls 可以查看当前的service状况
+比如：
+    C:\>docker service ls
+    ID             NAME               MODE         REPLICAS   IMAGE          PORTS
+    4gi09i7smfv1   elastic_thompson   replicated   1/1        nginx:latest
+    
+    注意这里的replicas 1/1
+    一个replicas可以理解为一个容器进程
+    我们这里的一览也是查看的service级别的一览
+
+使用 docker service ps [service ID] 可以service详细的信息
+比如：
+    C:\>docker service ps 4gi
+    ID             NAME                 IMAGE          NODE             DESIRED STATE   CURRENT STATE           ERROR     PORTS
+    joc8az9kgn9l   elastic_thompson.1   nginx:latest   docker-desktop   Running         Running 7 minutes ago
+    
+    这里我们看到的就是每一个replica的，或者说容器的进程的id
+
+
+注意这里以上的id都不是我们实际执行的容器的id，使用查看容器可以发现如下
+    C:\>docker container ls
+    CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS         PORTS     NAMES
+    f9c377ef6412   nginx:latest   "/docker-entrypoint.…"   4 minutes ago   Up 4 minutes   80/tcp    elastic_thompson.1.joc8az9kgn9lzr9vx1whnwz9g
+
+
+可以使用 docker service update 命令来横向的阔展service
+    比如：
+        C:\>docker service update 4gi --replicas 3
+        4gi
+        overall progress: 3 out of 3 tasks
+        1/3: running
+        2/3: running
+        3/3: running
+        verify: Service converged
+    这时我们再查看
+        C:\>docker service ls
+        ID             NAME               MODE         REPLICAS   IMAGE          PORTS
+        4gi09i7smfv1   elastic_thompson   replicated   3/3        nginx:latest
+        C:\>docker service ps 4gi
+        ID             NAME                 IMAGE          NODE             DESIRED STATE   CURRENT STATE            ERROR     PORTS
+        joc8az9kgn9l   elastic_thompson.1   nginx:latest   docker-desktop   Running         Running 22 minutes ago
+        3ssuze72g19i   elastic_thompson.2   nginx:latest   docker-desktop   Running         Running 3 minutes ago
+        36iu3z2ljk2o   elastic_thompson.3   nginx:latest   docker-desktop   Running         Running 3 minutes ago
+    此时，service的replicas变成了3/3，使用ps查看详细也可以看到3个
+    当然我们使用container ls也可以看到三个容器
+
+swarm的service和k8s一样，会自动的维持可运行的replicas的数量
+    比如如果我们删除一个容器
+        C:\>docker container ls
+        CONTAINER ID   IMAGE          COMMAND                  CREATED          STATUS
+        48462107736f   nginx:latest   "/docker-entrypoint.…"   15 minutes ago   Up 15 minutes
+        287e09d81f9d   nginx:latest   "/docker-entrypoint.…"   15 minutes ago   Up 15 minutes
+        f9c377ef6412   nginx:latest   "/docker-entrypoint.…"   34 minutes ago   Up 33 minutes
+        C:\>docker container rm -f 484
+        484
+    这时可以看到replicas已经变成了2/3
+        C:\>docker service ls
+        ID             NAME               MODE         REPLICAS   IMAGE          PORTS
+        4gi09i7smfv1   elastic_thompson   replicated   2/3        nginx:latest
+    再查看详细
+        C:\>docker service ps 4gi
+        ID             NAME                     IMAGE          NODE             DESIRED STATE
+        joc8az9kgn9l   elastic_thompson.1       nginx:latest   docker-desktop   Running
+        q0s80ianbz1c   elastic_thompson.2       nginx:latest   docker-desktop   Running
+        3ssuze72g19i    \_ elastic_thompson.2   nginx:latest   docker-desktop   Shutdown
+        36iu3z2ljk2o   elastic_thompson.3       nginx:latest   docker-desktop   Running
+    可以看到检测到一个容器已被shutdown，开始启动一个新的容器
+    过一段时间再查看，会发现replicas的数量又变回了3个
+        （ls和ps的结果略）
+
+如果需要删除service，使用 docker service rm 命令即可
+    比如：
+        C:\>docker service rm 4gi
+        4gi
+        C:\>docker service ls
+        ID        NAME      MODE      REPLICAS   IMAGE     PORTS
+        C:\>

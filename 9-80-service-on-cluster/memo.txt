@@ -1,0 +1,108 @@
+搭建好3个节点的cluster之后
+    [node1] (local) root@192.168.0.18 ~
+    $ docker node ls
+    ID                            HOSTNAME   STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
+    juamjihrcjbqi9wymcwilgmqk *   node1      Ready     Active         Leader           20.10.0
+    ref524w838o0v096nr6ti74n1     node2      Ready     Active                          20.10.0
+    bi5a5z567znb7tdhy9vmkn7w5     node3      Ready     Active                          20.10.0
+    [node1] (local) root@192.168.0.18 ~
+
+跟之前的单节点一样，使用service create，启动
+    [node1] (local) root@192.168.0.18 ~
+    $ docker service create --name web nginx
+    upg9gl6x4nw8nvblxcakq0eb2
+    overall progress: 1 out of 1 tasks 
+        这次给启动的service设定了名字，用法和docker容器的名字一样
+        以后的update，ps，rm等命令，可以使用名字而不是id
+        如果不起名字，系统就会给默认设置一个
+    
+
+使用 service ls 查看服务，已经启动，replicas=1
+    $ docker service ls
+    ID             NAME      MODE         REPLICAS   IMAGE          PORTS
+    upg9gl6x4nw8   web       replicated   1/1        nginx:latest
+
+使用 service ps 查看服务的具体情况，一个replica运行再node1上
+    [node1] (local) root@192.168.0.18 ~
+    $ docker service ps upg
+    ID             NAME      IMAGE          NODE      DESIRED STATE   CURRENT STATE            ERROR     PORTS
+    z9vp68s7r6s9   web.1     nginx:latest   node1     Running         Running 37 seconds ago
+
+在node1上我们使用container ls ，能看到一个容器已经被启动
+    [node1] (local) root@192.168.0.18 ~
+    $ docker container ls
+    CONTAINER ID   IMAGE          COMMAND                  CREATED          STATUS          PORTS     NAMES
+    b4da3a029f57   nginx:latest   "/docker-entrypoint.…"   51 seconds ago   Up 51 seconds   80/tcp    web.1.z9vp68s7r6s9y9zvoa2jgql2u
+
+这时在master的节点上update启动的service，设定replica为3
+    [node1] (local) root@192.168.0.18 ~
+    $ docker service update web --replicas 3
+    web
+    overall progress: 3 out of 3 tasks   
+
+一段事件之后，使用service ls可以看到，replicas已经变成了3/3
+    $ docker service ls
+    ID             NAME      MODE         REPLICAS   IMAGE          PORTS
+    upg9gl6x4nw8   web       replicated   3/3        nginx:latest
+
+使用ps查看，三个节点上各一个replica
+    $ docker service ps web
+    ID             NAME      IMAGE          NODE      DESIRED STATE   CURRENT STATE                ERROR     PORTS
+    z9vp68s7r6s9   web.1     nginx:latest   node1     Running         Running about a minute ago
+    x9llj8w7r4hp   web.2     nginx:latest   node2     Running         Running 31 seconds ago
+    rr36xrkvlucw   web.3     nginx:latest   node3     Running         Running 31 seconds ago
+
+在node1上查看容器，启动了一个容器
+    [node1] (local) root@192.168.0.18 ~
+    $ docker container ls
+    CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS         PORTS     NAMES
+    b4da3a029f57   nginx:latest   "/docker-entrypoint.…"   2 minutes ago   Up 2 minutes   80/tcp    web.1.z9vp68s7r6s9y9zvoa2jgql2u
+
+在node3上查看，也可以看到启动一个容器
+    [node3] (local) root@192.168.0.16 ~
+    $ docker container ls
+    CONTAINER ID   IMAGE          COMMAND                  CREATED              STATUS              PORTS     NAMES
+    65d93651e45f   nginx:latest   "/docker-entrypoint.…"   About a minute ago   Up About a minute   80/tcp    web.3.rr36xrkvlucwto434ufsbz64v
+
+※ node2忘看了
+
+想要横向scale我们的服务，除了上边这种update的方法，也可以想docker-compose一样使用scale命令
+    [node1] (local) root@192.168.0.18 ~
+    $ docker service scale web=4
+    web scaled to 4
+    overall progress: 4 out of 4 tasks    
+
+再次 ps 查看，可以发现已经启动了4个replica
+    $ docker service ps web
+    ID             NAME      IMAGE          NODE      DESIRED STATE   CURRENT STATE            ERROR     PORTS
+    z9vp68s7r6s9   web.1     nginx:latest   node1     Running         Running 5 minutes ago
+    x9llj8w7r4hp   web.2     nginx:latest   node2     Running         Running 3 minutes ago
+    rr36xrkvlucw   web.3     nginx:latest   node3     Running         Running 3 minutes ago
+    6imf1eirn0z5   web.4     nginx:latest   node1     Running         Running 12 seconds ago
+
+
+最后一个重要的功能，使用logs命令查看我们服务的启动和变更的log
+    [node1] (local) root@192.168.0.18 ~
+    $ docker service logs web
+    web.4.6imf1eirn0z5@node1    | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+    web.4.6imf1eirn0z5@node1    | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+    web.4.6imf1eirn0z5@node1    | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+    web.4.6imf1eirn0z5@node1    | 10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+    web.4.6imf1eirn0z5@node1    | 10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+    web.4.6imf1eirn0z5@node1    | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+    web.4.6imf1eirn0z5@node1    | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.shell
+    ......
+
+还可以添加 -f 参数，以及监视log的变化，有点像tail -f看log那个意思
+    [node1] (local) root@192.168.0.18 ~
+    $ docker service logs web -f
+    web.3.rr36xrkvlucw@node3    | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+    web.3.rr36xrkvlucw@node3    | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+    .....
+    web.2.x9llj8w7r4hp@node2    | 2021/12/21 06:24:25 [notice] 1#1: start worker process 39
+    ^C
+    [node1] (local) root@192.168.0.18 ~
+    $
+
+    想要结束像上边这样，ctrl+C即可
+ 

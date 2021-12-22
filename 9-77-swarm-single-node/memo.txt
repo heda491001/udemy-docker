@@ -1,0 +1,48 @@
+
+
+docker info 
+    这个命令可以查看我们的docker engine有没有激活swarm模式， 
+    默认是没有的，我们会看到
+    Swarm: inactive
+
+
+docker swarm init
+    这个命令即可激活swarm，会看到如下的结果
+        --------------------
+        Swarm initialized: current node (fg7fro6l0ya6w2kq2v7waqraq) is now a manager.
+
+        To add a worker to this swarm, run the following command:
+
+            docker swarm join --token SWMTKN-1-1hsezrklpfw70twmb04msdiqee3wek2r0j0c83t9brcgnuqwmn-ae9fseh6ukom1zelsgtszxy8r 192.168.65.3:2377
+
+        To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+        -----------------------
+    激活后可以在使用docker info，就会发现有node和现在cluster的相关信息
+    再别的机器上，使用上边init结果提示的命令即可加入集群
+
+init背后执行的内容
+    主要是PKI和安全相关的自动化
+     -  创建swarm集群的根证书
+     -  manager节点的证书
+     -  其它节点加入集群需要的tokens
+    创建Raft数据库用于存储证书，配置，密码等数据
+        RAFT相关资料
+            http://thesecretlivesofdata.com/raft/
+            https://raft.github.io/
+            https://docs.docker.com/engine/swarm/raft/
+        看动画学会 Raft 算法
+            https://mp.weixin.qq.com/s/p8qBcIhM04REuQ-uG4gnbw
+
+如果想退出集群
+    docker swarm leave
+        如果想实验中只有一个节点的，情况则会出现如下错误
+        -------
+        C:\>docker swarm leave
+        Error response from daemon: You are attempting to leave the swarm 
+        on a node that is participating as a manager. Removing the last 
+        manager erases all current state of the swarm. Use `--force` to 
+        ignore this message.
+        -------
+        根据提示信息，使用 --force 参数即可
+    这时再使用 docker info 查看，会发现swarm已经便问inactive
+    

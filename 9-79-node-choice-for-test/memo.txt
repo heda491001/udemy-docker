@@ -1,0 +1,56 @@
+这次使用下边的play with docker 网站，优点是快速方便，缺点是环境不持久，4个小时后环境会被重置
+https://labs.play-with-docker.com/ 
+
+当然也可以自己使用cloud来创建虚拟机
+    注意security-group等的设定，把需要用的几个端口都打开
+    TCP port 2376
+    TCP port 2377
+    TCP and UDP port 7946
+    UDP port 4789
+
+点击左边的add new instance增加机器，
+然后使用网页上的ssh命令链接instance
+    直接使用网页上的好像不能拷贝结果
+
+docker playground的节点都是linux的
+
+----- 1号机配置 -----
+如果我们直接使用之前提到的init命令会提示错误
+    $ docker swarm init
+    Error response from daemon: could not choose an IP address to advertise 
+    since this system has multiple addresses on different interfaces 
+    (192.168.0.18 on eth0 and 172.18.0.8 on eth1) - specify one with --advertise-addr
+使用eth0的ip来初始化，加上 --advertise-addr 192.168.0.18 参数
+    $ docker swarm init  --advertise-addr 192.168.0.18
+    Swarm initialized: current node (juamjihrcjbqi9wymcwilgmqk) is now a manager.
+
+    To add a worker to this swarm, run the following command:
+
+        docker swarm join --token SWMTKN-1-5tfjmflulri9vsffnm5r5uicog99u4099r7lu0rfk5pxo88hbb-3lov2kp1ph11m9e2smtbg05kw 192.168.0.18:2377
+
+    To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+这时我们来查看node，添加了当前的机器
+    $ docker node ls
+    ID                            HOSTNAME   STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
+    juamjihrcjbqi9wymcwilgmqk *   node1      Ready     Active         Leader           20.10.0
+
+---- 2，3号机配置 ----
+在2，3号机上直接执行上边1号机上提示的join命令
+    [node2] (local) root@192.168.0.17 ~
+    $ docker swarm join --token SWMTKN-1-5tfjmflulri9vsffnm5r5uicog99u4099r7lu0rfk5pxo88hbb-3lov2kp1ph11m9e2smtbg05kw 192.168.0.18:2377
+    This node joined a swarm as a worker.
+
+    [node3] (local) root@192.168.0.16 ~
+    $ docker swarm join --token SWMTKN-1-5tfjmflulri9vsffnm5r5uicog99u4099r7lu0rfk5pxo88hbb-3lov2kp1ph11m9e2smtbg05kw 192.168.0.18:2377
+    This node joined a swarm as a worker.
+这样2号机和3号机就已经变成了worker
+
+都完成后再回到1号机上查看node，三个node都已加入cluster，manager是node1，worker是两个
+    [node1] (local) root@192.168.0.18 ~
+    $ docker node ls
+    ID                            HOSTNAME   STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
+    juamjihrcjbqi9wymcwilgmqk *   node1      Ready     Active         Leader           20.10.0
+    ref524w838o0v096nr6ti74n1     node2      Ready     Active                          20.10.0
+    bi5a5z567znb7tdhy9vmkn7w5     node3      Ready     Active                          20.10.0
+
+    ※ manager其实也可以有多个，以防manager挂掉

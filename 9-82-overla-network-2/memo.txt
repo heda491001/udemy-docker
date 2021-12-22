@@ -1,0 +1,149 @@
+
+使用 network 的 ls 命令查看
+    root@ip-10-0-2-197:~# docker network ls
+    NETWORK ID     NAME              DRIVER    SCOPE
+    70a89ff52b79   bridge            bridge    local
+    f600df09a6f8   docker_gwbridge   bridge    local
+    abccda9ef314   host              host      local
+    v583qktkjzqd   ingress           overlay   swarm
+    lr7ugdh1kdl2   my-swarm-net      overlay   swarm
+    b1cfd68949f3   none              null      local
+    root@ip-10-0-2-197:~#
+
+注意2个网络，docker_gwbridge和ingress
+在我们使用swarm的init或者是join到clutser中后，network这边就会在节点上自动创建
+下边引用一下https://dockertips.readthedocs.io/en/latest/docker-swarm/overlay-network.html的内容
+
+    对于理解swarm的网络来讲，个人认为最重要的两个点：
+        第一是外部如何访问部署运行在swarm集群内的服务，可以称之为 入方向 流量，在swarm里我们通过 ingress 来解决
+        第二是部署在swarm集群里的服务，如何对外进行访问，这部分又分为两块:
+            第一，东西向流量 ，也就是不同swarm节点上的容器之间如何通信，swarm通过 overlay 网络来解决；
+            第二，南北向流量 ，也就是swarm集群里的容器如何对外访问，比如互联网，这个是 Linux bridge + iptables NAT 来解决的
+
+
+还跟上节一样，我们启动一个我们自己overlay网络中的服务
+    docker service create --name test --network my-swarm-net busybox ping 8.8.8.8
+    docker service scale test=2
+    ...
+    root@ip-10-0-2-197:~# docker service ls
+    ID             NAME      MODE         REPLICAS   IMAGE            PORTS
+    ic1ro2pbbymn   test      replicated   2/2        busybox:latest
+    ...
+    root@ip-10-0-2-197:~# docker service ps test
+    ID             NAME      IMAGE            NODE            DESIRED STATE   CURRENT STATE            ERROR     PORTS
+    6e65gy10az30   test.1    busybox:latest   ip-10-0-2-197   Running         Running 2 minutes ago         
+    wi1wl6v8zygk   test.2    busybox:latest   ip-10-0-2-253   Running         Running 18 seconds ago        
+    现在服务test在node1和node2上各启动了一个容器
+
+在 node1 容器中查看网络设定
+   root@ip-10-0-2-197:~# docker container exec d76 ip a
+    1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue qlen 1000
+        link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+        inet 127.0.0.1/8 scope host lo
+        valid_lft forever preferred_lft forever
+    16: eth0@if17: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1450 qdisc noqueue
+        link/ether 02:42:0a:00:01:03 brd ff:ff:ff:ff:ff:ff
+        inet 10.0.1.3/24 brd 10.0.1.255 scope global eth0
+        valid_lft forever preferred_lft forever
+    18: eth1@if19: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 qdisc noqueue
+        link/ether 02:42:ac:12:00:03 brd ff:ff:ff:ff:ff:ff
+        inet 172.18.0.3/16 brd 172.18.255.255 scope global eth1
+        valid_lft forever preferred_lft forever
+    root@ip-10-0-2-197:~#
+
+在 node2 容器中查看网络设定
+    root@ip-10-0-2-253:~# docker container exec d20 ip a
+    1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue qlen 1000
+        link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+        inet 127.0.0.1/8 scope host lo
+        valid_lft forever preferred_lft forever
+    14: eth0@if15: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1450 qdisc noqueue
+        link/ether 02:42:0a:00:01:05 brd ff:ff:ff:ff:ff:ff
+        inet 10.0.1.5/24 brd 10.0.1.255 scope global eth0
+        valid_lft forever preferred_lft forever
+    16: eth1@if17: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1500 qdisc noqueue
+        link/ether 02:42:ac:12:00:03 brd ff:ff:ff:ff:ff:ff
+        inet 172.18.0.3/16 brd 172.18.255.255 scope global eth1
+        valid_lft forever preferred_lft forever
+    root@ip-10-0-2-253:~#
+
+进一步的用inspect查看docker的network设定（结果略），可以发现
+    eth0的10.0.1.0/24这个网段，就是overlay的my-swarm-net
+        用来实现容器间的横向通信
+        比如，从node1上的容器中ping我们node2上容器，使用eth0的地址，即可ping通
+            root@ip-10-0-2-197:~# docker container exec d76 ping 10.0.1.5
+            PING 10.0.1.5 (10.0.1.5): 56 data bytes
+            64 bytes from 10.0.1.5: seq=0 ttl=64 time=0.671 ms
+            64 bytes from 10.0.1.5: seq=1 ttl=64 time=0.745 ms
+            64 bytes from 10.0.1.5: seq=2 ttl=64 time=0.580 ms
+            64 bytes from 10.0.1.5: seq=3 ttl=64 time=0.611 ms
+            64 bytes from 10.0.1.5: seq=4 ttl=64 time=0.616 ms
+            64 bytes from 10.0.1.5: seq=5 ttl=64 time=0.615 ms
+    eth1的172.18.0.0/16这个网段，是我们的docker_gwbridge网段
+        用来实现容器对外访问的纵向通信
+    
+进一步的查看容器的路由设定，
+    root@ip-10-0-2-197:~# docker container exec d76 ip route
+    default via 172.18.0.1 dev eth1
+    10.0.1.0/24 dev eth0 scope link  src 10.0.1.3
+    172.18.0.0/16 dev eth1 scope link  src 172.18.0.3
+    root@ip-10-0-2-197:~#
+    最上边的默认路由（default），对的就是docker_gwbridge的网关
+    两个路由，
+        横向的overlay网络的设定
+        纵向，对外访问的gateway地
+
+
+
+docker的overlay网络，使用了vxlan的技术，
+    将cluster内容器间的访问进行了打包处理，
+    使其可以像在同一局域网内一样进行通信
+
+
+补充实验：抓取my-swarm-net中通信的vxlan包
+    首先在node2的机器上使用tcpdump开始进行抓包
+        这里的参数
+            eth0是指node1和node2之间进行通信时使用的网络
+            port 4789 就是docker的vxlan使用的网络端口
+
+        root@ip-10-0-2-253:~# tcpdump -i eth0 port 4789
+        tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+        listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+        
+    然后在node1的容器中开始ping node2的中的容器
+        这里设定一下次数，一共ping 3次
+        
+        root@ip-10-0-2-197:~# docker container exec 559 ping 10.0.1.5 -c 3
+        PING 10.0.1.5 (10.0.1.5): 56 data bytes
+        64 bytes from 10.0.1.5: seq=0 ttl=64 time=1.149 ms
+        64 bytes from 10.0.1.5: seq=1 ttl=64 time=0.698 ms
+        64 bytes from 10.0.1.5: seq=2 ttl=64 time=0.669 ms
+
+        --- 10.0.1.5 ping statistics ---
+        3 packets transmitted, 3 packets received, 0% packet loss
+        round-trip min/avg/max = 0.669/0.838/1.149 ms
+        
+    这时在node2上边就可以观测到
+        一共抓到了6个包
+            因为ping命令是相互的，发过去一个包，对方还会返回一个包
+        vni 4097这个值
+            docker network inspect 一下自己创建的overlay网络，
+            结果的option中就可以看到
+                   "Options": {
+                        "com.docker.network.driver.overlay.vxlanid_list": "4097"
+                    },
+            这里的4097就是我们自己的overlay网络设定的id
+            
+        04:27:59.184691 IP 10.0.2.197.46048 > ip-10-0-2-253.4789: VXLAN, flags [I] (0x08), vni 4097
+        IP 10.0.1.7 > 10.0.1.5: ICMP echo request, id 9, seq 0, length 64
+        04:27:59.185287 IP ip-10-0-2-253.39852 > 10.0.2.197.4789: VXLAN, flags [I] (0x08), vni 4097
+        IP 10.0.1.5 > 10.0.1.7: ICMP echo reply, id 9, seq 0, length 64
+        04:28:00.184901 IP 10.0.2.197.46048 > ip-10-0-2-253.4789: VXLAN, flags [I] (0x08), vni 4097
+        IP 10.0.1.7 > 10.0.1.5: ICMP echo request, id 9, seq 1, length 64
+        04:28:00.185070 IP ip-10-0-2-253.39852 > 10.0.2.197.4789: VXLAN, flags [I] (0x08), vni 4097
+        IP 10.0.1.5 > 10.0.1.7: ICMP echo reply, id 9, seq 1, length 64
+        04:28:01.185091 IP 10.0.2.197.46048 > ip-10-0-2-253.4789: VXLAN, flags [I] (0x08), vni 4097
+        IP 10.0.1.7 > 10.0.1.5: ICMP echo request, id 9, seq 2, length 64
+        04:28:01.185237 IP ip-10-0-2-253.39852 > 10.0.2.197.4789: VXLAN, flags [I] (0x08), vni 4097
+        IP 10.0.1.5 > 10.0.1.7: ICMP echo reply, id 9, seq 2, length 64
+        
