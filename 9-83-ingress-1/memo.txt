@@ -1,0 +1,56 @@
+以下来自docker.tips
+    docker swarm的ingress网络又叫 Ingress Routing Mesh
+    主要是为了实现把service的服务端口对外发布出去，让其能够被外部网络访问到。
+    ingress routing mesh是docker swarm网络里最复杂的一部分内容，包括多方面的内容：
+        iptables的 Destination NAT流量转发
+        Linux bridge, network namespace
+        使用IPVS技术做负载均衡
+        包括容器间的通信（overlay）和入方向流量的端口转发
+
+在my-swarm-net中创建一个containous/whoami的服务
+    这个服务内容也很简单，即对http请求返回hostname本机ip等等信息
+    在service启动时使用 -p 参数，将本机的8080端口映射到service的容器80端口
+        $ docker service create --name web --network my-swarm-net -p 8080:80 --replicas 2 containous/whoami
+        vnsm8a33vc00a67s22skq757r
+        overall progress: 2 out of 2 tasks
+        1/2: running
+        2/2: running
+        verify: Service converged
+    service启动完毕，两个节点上各一个容器
+        $ docker service ps web
+        ID             NAME      IMAGE                      NODE            DESIRED STATE   CURRENT STATE                ERROR     PORTS
+        w6h7nmt8s3mm   web.1     containous/whoami:latest   ip-10-0-2-253   Running         Running about a minute ago
+        bly7hbs6wbu1   web.2     containous/whoami:latest   ip-10-0-2-197   Running         Running about a minute ago
+
+使用curl在node1上访问localhost：8080
+    $ curl localhost:8080
+    Hostname: f60f2beecf21
+    IP: 127.0.0.1
+    IP: 10.0.0.5
+    IP: 172.18.0.3
+    IP: 10.0.1.10
+    RemoteAddr: 10.0.0.2:56122
+    GET / HTTP/1.1
+    Host: localhost:8080
+    User-Agent: curl/7.68.0
+    Accept: */*
+再访问一次
+    $ curl localhost:8080
+    Hostname: 93ba26bad926
+    IP: 127.0.0.1
+    IP: 10.0.0.6
+    IP: 172.18.0.3
+    IP: 10.0.1.11
+    RemoteAddr: 10.0.0.2:56124
+    GET / HTTP/1.1
+    Host: localhost:8080
+    User-Agent: curl/7.68.0
+    Accept: */*
+
+两次访问的容器并不相同，ingress的网络自动的进行了一个负载均衡
+
+而且不论是放问node2，
+还是从node2甚至是本地进行访问，都可以得到相同的结果
+
+
+
