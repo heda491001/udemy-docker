@@ -1,0 +1,185 @@
+接上回，
+    为了在swarm上进行自动的部署，可以跟docker-compose使用一样的文件
+    使用命令stack
+
+这节完整的模拟一下开发的几个流程
+
+
+代码还是上一节的代码
+将代码克隆到本地
+    $ git clone https://github.com/xiaopeng163/flask-redis
+    Cloning into 'flask-redis'...
+    remote: Enumerating objects: 107, done.
+    remote: Counting objects: 100% (107/107), done.
+    remote: Compressing objects: 100% (49/49), done.
+    remote: Total 107 (delta 42), reused 83 (delta 30), pack-reused 0
+    Receiving objects: 100% (107/107), 18.82 KiB | 3.76 MiB/s, done.
+    Resolving deltas: 100% (42/42), done.
+    
+    $ cd flask-redis
+
+    $  ll
+    total 48
+    drwxr-xr-x 4 root root  4096 Dec 23 13:27 ./
+    drwxr-xr-x 3 root root  4096 Dec 23 13:28 ../
+    drwxr-xr-x 8 root root  4096 Dec 23 13:27 .git/
+    drwxr-xr-x 3 root root  4096 Dec 23 13:27 .github/
+    -rw-r--r-- 1 root root  1799 Dec 23 13:27 .gitignore
+    -rw-r--r-- 1 root root   279 Dec 23 13:27 Dockerfile
+    -rw-r--r-- 1 root root 11357 Dec 23 13:27 LICENSE
+    -rw-r--r-- 1 root root    14 Dec 23 13:27 README.md
+    -rw-r--r-- 1 root root   452 Dec 23 13:27 app.py
+    -rw-r--r-- 1 root root   352 Dec 23 13:27 docker-compose.yml
+
+改一下docker-compose.yml文件中镜像的设定，设成自己的dockerhub账号，一会还需要push镜像
+
+    $ vi docker-compose.yml
+
+        ※ 我直接用apt install 补装的docker-compose，居然只能支持到3.3版本
+           还需要把最上面的version改成3.3
+
+清理一下作业环境
+    docker system prune -a -f
+
+构建镜像
+    $ docker-compose build
+    redis-server uses an image, skipping
+    Building flask
+    Step 1/8 : FROM python:3-slim
+    3-slim: Pulling from library/python
+    a2abf6c4d29d: Pull complete
+    27003db43ed4: Pull complete
+    58c2647bdcdf: Pull complete
+    1809d7e69691: Pull complete
+    0daa42a9c7ff: Pull complete
+    Digest: sha256:dd3016f846b8f88d8f6c28b43f1da899f07259121aff403091e6f89a703c3d36
+    Status: Downloaded newer image for python:3-slim
+    ---> 58d8fd9767c5
+    Step 2/8 : RUN pip install flask redis &&     groupadd -r flask && useradd -r -g flask flask &&     mkdir /src &&     chown -R flask:flask /src
+    ---> Running in 0034c9660f90
+    Collecting flask
+    Downloading Flask-2.0.2-py3-none-any.whl (95 kB)
+    Collecting redis
+    Downloading redis-4.0.2-py3-none-any.whl (119 kB)
+    Collecting Werkzeug>=2.0
+    Downloading Werkzeug-2.0.2-py3-none-any.whl (288 kB)
+    Collecting Jinja2>=3.0
+    Downloading Jinja2-3.0.3-py3-none-any.whl (133 kB)
+    Collecting itsdangerous>=2.0
+    Downloading itsdangerous-2.0.1-py3-none-any.whl (18 kB)
+    Collecting click>=7.1.2
+    Downloading click-8.0.3-py3-none-any.whl (97 kB)
+    Collecting deprecated
+    Downloading Deprecated-1.2.13-py2.py3-none-any.whl (9.6 kB)
+    Collecting MarkupSafe>=2.0
+    Downloading MarkupSafe-2.0.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl (30 kB)
+    Collecting wrapt<2,>=1.10
+    Downloading wrapt-1.13.3-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl (81 kB)
+    Installing collected packages: wrapt, MarkupSafe, Werkzeug, Jinja2, itsdangerous, deprecated, click, redis, flask
+    Successfully installed Jinja2-3.0.3 MarkupSafe-2.0.1 Werkzeug-2.0.2 click-8.0.3 deprecated-1.2.13 flask-2.0.2 itsdangerous-2.0.1 redis-4.0.2 wrapt-1.13.3
+    WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+    WARNING: You are using pip version 21.2.4; however, version 21.3.1 is available.
+    You should consider upgrading via the '/usr/local/bin/python -m pip install --upgrade pip' command.
+    Removing intermediate container 0034c9660f90
+    ---> 43ee294e91f1
+    Step 3/8 : USER flask
+    ---> Running in 07b7a3d893df
+    Removing intermediate container 07b7a3d893df
+    ---> 1184132181df
+    Step 4/8 : COPY app.py /src/app.py
+    ---> eb42d80e9dcd
+    Step 5/8 : WORKDIR /src
+    ---> Running in 0cd491f07d1d
+    Removing intermediate container 0cd491f07d1d
+    ---> 67eed852f1bf
+    Step 6/8 : ENV FLASK=app.py
+    ---> Running in 5aec4a9fcaf5
+    Removing intermediate container 5aec4a9fcaf5
+    ---> 0ec44d277f92
+    Step 7/8 : EXPOSE 5000
+    ---> Running in 201c426c1ebb
+    Removing intermediate container 201c426c1ebb
+    ---> eccf5df5763e
+    Step 8/8 : CMD ["flask", "run", "-h", "0.0.0.0"]
+    ---> Running in 2ff0171c7236
+    Removing intermediate container 2ff0171c7236
+    ---> 001c3274e7ae
+
+    Successfully built 001c3274e7ae
+    Successfully tagged xxxxxxxx/flask-redis:latest
+
+省略了一些开发的步骤
+    其实这之中还会有在本地使用docker-compose的测试等等
+    等到测试全部ok后
+
+推送到dockerhub
+    在实际的生产中，也有可能是私有的镜像repos等等
+
+    $ docker push xxxxxxxx/flask-redis:latest
+    The push refers to repository [docker.io/xxxxxxxx/flask-redis]
+    3f906d0fd082: Pushed
+    8c9b8d855efc: Pushed
+    8c5846e2aa51: Mounted from library/python
+    5685f677e567: Mounted from library/python
+    88eb0cb0eb94: Mounted from library/python
+    5359ff267161: Mounted from library/python
+    2edcec3590a4: Mounted from library/python
+    latest: digest: sha256:2394fa2fb391ddb78348acccd476cefee78dd25135d8c1950395440efb5ea47d size: 1788
+
+最后使用stack命令，将docker-compose定义服务等部署到cluster
+    $ env REDIS_PASSWORD=ABC123 docker stack deploy --compose-file docker-compose.yml flask-demo
+    Ignoring unsupported options: build
+
+    Creating network flask-demo_default
+    Creating service flask-demo_flask
+    Creating service flask-demo_redis-server
+
+完成
+
+查看一下
+    常用命令和service的差不多
+stack一览
+    $ docker stack ls
+    NAME         SERVICES   ORCHESTRATOR
+    flask-demo   2          Swarm
+stack里的service一览
+    $ docker stack services flask-demo
+    ID             NAME                      MODE         REPLICAS   IMAGE                           PORTS
+    ab2ohf3ul9vc   flask-demo_flask          replicated   1/1        heda491001/flask-redis:latest   *:8080->5000/tcp
+    oejivtha469g   flask-demo_redis-server   replicated   1/1        redis:latest                
+
+stack里的容器（replica）一览
+    $ docker stack ps flask-demo
+    ID             NAME                        IMAGE                           NODE            DESIRED STATE   CURRENT STATE            ERROR     PORTS
+    nak0y5j2x4bk   flask-demo_flask.1          heda491001/flask-redis:latest   ip-10-0-2-253   Running         Running 57 seconds ago
+    jgvvlweo3mnq   flask-demo_redis-server.1   redis:latest                    ip-10-0-2-197   Running         Running 58 seconds ago
+
+最后，删除stack
+    $ docker stack rm flask-demo
+    Removing service flask-demo_flask
+    Removing service flask-demo_redis-server
+    Removing network flask-demo_default
+
+---------
+补充
+---------
+
+在本节的docker-compose文件中，并没有网络相关的设定
+和compose类似，stack在启动时如果没有定义，会自动创建一个default的网络
+    类型是overlay
+
+    $ docker network ls
+    NETWORK ID     NAME                 DRIVER    SCOPE
+    2c7829a2fb76   bridge               bridge    local
+    f600df09a6f8   docker_gwbridge      bridge    local
+    kkhcguifdykl   flask-demo_default   overlay   swarm
+    abccda9ef314   host                 host      local
+    v583qktkjzqd   ingress              overlay   swarm
+    b1cfd68949f3   none                 null      local
+
+但是如果在开发时想定义一些网络的相关设定，供本地测试时使用
+而prod环境肯定也有另一组所需要的网络设定
+
+最直接最常用的方法，
+    就是把直接dev环境和prod环境使用docker-compose文件分开管理
+

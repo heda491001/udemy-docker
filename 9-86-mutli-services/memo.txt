@@ -1,0 +1,79 @@
+如何像docker-compose一样部署多服务应用，这一节我们先看手动的方式
+本节课所用的源码文件 https://github.com/xiaopeng163/flask-redis
+
+
+创建一个mynet的overlay网络
+    $ docker network create -d overlay mynet
+    lmuwr8ee6rjk2f00mizrzf6rv
+    $
+    $ docker network ls
+    NETWORK ID     NAME              DRIVER    SCOPE
+    2c7829a2fb76   bridge            bridge    local
+    f600df09a6f8   docker_gwbridge   bridge    local
+    abccda9ef314   host              host      local
+    v583qktkjzqd   ingress           overlay   swarm
+    lmuwr8ee6rjk   mynet             overlay   swarm
+    b1cfd68949f3   none              null      local
+
+创建redis的service
+    参数设定
+        --network mynet 
+            放在创建的overlay的mynet中
+        --name redis 
+            服务的名字为redis
+        redis:latest 
+            直接使用官方的最新镜像
+        redis-server --requirepass ABC123 
+            手动执行redis启动命令，设定密码为ABC123
+    运行结果
+    $ docker service create --network mynet --name redis redis:latest redis-server --requirepass ABC123
+    hws6uug5rdyjqn7t0eyyt3d9h
+    overall progress: 1 out of 1 tasks
+    1/1: running   [==================================================>]
+    verify: Service converged
+        启动完成
+
+创建flask的service
+    镜像可以使用上边提供的github网址，自己使用dockerfile来build，推送到dockerhub上
+    或者可以直接使用课程利用的这个 xiaopeng163/flask-redis:latest
+    参数
+        --network mynet 放在创建的overlay的mynet中
+        --name flask 服务的名字为flask
+        两个环境变量
+        --env REDIS_HOST=redis 
+            连接redis服务时使用的dns名称，直接就是docker-network自动生成的service名
+        --env REDIS_PASS=ABC123 
+            连接redis服务使用的密码，跟上边一样设成ABC23
+        -p 8080:5000 
+            端口映射，从内部的5000，映射到cluster的8080
+        xiaopeng163/flask-redis:latest  
+    运行结果
+    $ docker service create --network mynet --name flask --env REDIS_HOST=redis --env REDIS_PASS=ABC123 -p 8080:5000 xiaopeng163/flask-redis:latest
+    scodjp8gee8nj81zonz32zbn6
+    overall progress: 1 out of 1 tasks
+    1/1: running
+    verify: Service converged
+
+成功后测试
+1.可以在node上，curl本地8080
+    $ curl localhost:8080
+    Hello Container World! I have been seen 2 times and my hostname is b03347923eb2.
+    $ curl localhost:8080
+    Hello Container World! I have been seen 3 times and my hostname is b03347923eb2.
+    成功
+2.也可直接在自己电脑上用浏览器访问node的8080
+    （结果略）
+
+-----------
+注意
+-----------
+1. 使用swarm里边是不能进行build，只能使用构建好的image
+    docker swarm 主要时面向的生产（prod）的环境构建
+        构建部署生产环境时就要求我们一定要事先的构建/测试完要部署image
+    docker compose 更多的是面向开发环境（dev）
+        因此它可以有compose build的功能，但相应的也只支持单节点的部署
+            
+2. 如果有复杂的架构，手动显然是不现实的
+    需要像类似docker-compose.yml文件的定义
+    其实swarm可以使用一样的docker-compose文件，
+        只不过命令不相同，接下节

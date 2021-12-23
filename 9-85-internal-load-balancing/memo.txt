@@ -1,0 +1,128 @@
+上节通过ingress，实现了外部对容器访问的负载均衡
+但对于各个节点的cluster内部的进行相互访问，
+其实也有一个内部（internal）的负载均衡
+    内部访问的时候，会使用vip的相应技术，实现内部的负载均衡
+
+实验的环境和上次基本相同
+    overlay网络my-swarm-net的网络
+    名叫web的服务，两个replica，镜像containous/whoami
+
+然后再启动一个client的service
+    $ docker service create --name client --network my-swarm-net xiaopeng163/net-box:latest ping 8.8.8.8
+    kdey76wfe12aayolkoshyfac9
+    overall progress: 1 out of 1 tasks
+    1/1: running
+    verify: Service converged
+
+从client内ping web的service名字
+    $ docker exec client.1.n770c4a4yl3ysdk7t9lwwy5a6 ping web
+    PING web (10.0.1.4): 56 data bytes
+    64 bytes from 10.0.1.4: seq=0 ttl=64 time=0.113 ms
+    64 bytes from 10.0.1.4: seq=1 ttl=64 time=0.108 ms
+    64 bytes from 10.0.1.4: seq=2 ttl=64 time=0.115 ms
+    发现可以对service的名ping通
+    和compose类似，这里自动给service名做了一个dns
+
+但可以发现，这里ping解析出来的地址 (10.0.1.4) ,并不是service任何replica的地址
+再连续的curl请求web几次，进行验证
+    $ docker exec client.1.n770c4a4yl3ysdk7t9lwwy5a6 curl -s web
+    Hostname: 174c020eca8d
+    IP: 127.0.0.1
+    IP: 10.0.0.8
+    IP: 172.18.0.3
+    IP: 10.0.1.5
+    RemoteAddr: 10.0.1.8:44266
+    GET / HTTP/1.1
+    Host: web
+    User-Agent: curl/7.69.1
+    Accept: */*
+
+    $ docker exec client.1.n770c4a4yl3ysdk7t9lwwy5a6 curl -s web
+    Hostname: 08d42a135ff0
+    IP: 127.0.0.1
+    IP: 10.0.0.9
+    IP: 172.18.0.3
+    IP: 10.0.1.6
+    RemoteAddr: 10.0.1.8:44268
+    GET / HTTP/1.1
+    Host: web
+    User-Agent: curl/7.69.1
+    Accept: */*
+
+    这里返回的就是service的replica的ip
+    并且多次返回的不一样，有负载均衡
+
+那么ping时解析web返回的 10.0.1.4
+    即所谓的VIP，有点类似我们上节ingress中的ingress-sbox
+    查看自定义的my-swarm-net的设定
+    $ docker network inspect my-swarm-net
+        .....
+        "Containers": {
+            "08d42a135ff0d19a0178a081f0ff302d231b59914c36584bea1048ff4f00e6b4": {
+                "Name": "web.2.l1o26wbua0qejtnr7gbadwptv",
+                "EndpointID": "901b416e7a0198edfefa13b285b763298c031b1f83e65571a0a4ad09a50635ff",
+                "MacAddress": "02:42:0a:00:01:06",
+                "IPv4Address": "10.0.1.6/24",
+                "IPv6Address": ""
+            },
+            "lb-my-swarm-net": {
+                "Name": "my-swarm-net-endpoint",
+                "EndpointID": "c13b062df94307fd37cf17aa7a3250f8ad79221fa0458b2290c3713d98183ddb",
+                "MacAddress": "02:42:0a:00:01:07",
+                "IPv4Address": "10.0.1.7/24",
+                "IPv6Address": ""
+            }
+        },
+        .....
+    也类似之前的ingress网络，网络中两个容器，
+    一个是定义的service的replica，
+    另一个 lb-my-swarm-net ，就是我们要找的VIP
+    和ingress的ingress-sbox类似
+    这个lb-my-swarm-net也不是一个真正的容器，而是namespace
+
+进入namespace
+    首先查看docker的namespace设定
+        $  ls /var/run/docker/netns/
+        1-lr7ugdh1kd  1-v583qktkjz  249aabbb8411  ingress_sbox  lb_lr7ugdh1k
+    之前学习的ingress_sbox也在这里，lb_lr7ugdh1k就是我们要找的VIP
+    想要进入namespace，使用上一节的方法，启动一个容器进入namespace
+    或者如果node上装了nsenter的，可以直接使用nsenter进去（注意sudo）
+        $  nsenter --net=/var/run/docker/netns/lb_lr7ugdh1k
+    接下来就和上一节看ingress的类似
+    查看网络设定
+        $ ip a
+        1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+            link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+            inet 127.0.0.1/8 scope host lo
+            valid_lft forever preferred_lft forever
+        21: eth0@if22: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP group default
+            link/ether 02:42:0a:00:01:07 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+            inet 10.0.1.7/24 brd 10.0.1.255 scope global eth0
+            valid_lft forever preferred_lft forever
+            inet 10.0.1.4/32 scope global eth0
+            valid_lft forever preferred_lft forever
+            inet 10.0.1.9/32 scope global eth0
+            valid_lft forever preferred_lft forever
+        首先ip a，10.0.1.4/32这个网段都在eth0
+    查看iptables的转发
+        $ iptables -nvL -t mangle
+        ......
+        Chain INPUT (policy ACCEPT 0 packets, 0 bytes)
+        pkts bytes target     prot opt in     out     source               destination
+            0     0 MARK       all  --  *      *       0.0.0.0/0            10.0.1.4             MARK set 0x103
+            0     0 MARK       all  --  *      *       0.0.0.0/0            10.0.1.9             MARK set 0x104
+        ......
+        这里所有10.0.1.4的请求都会打一个0x103的MARK，十进制即259
+    
+    然后和查看ipvs设定
+        $ ipvsadm
+        IP Virtual Server version 1.2.1 (size=4096)
+        Prot LocalAddress:Port Scheduler Flags
+        -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+        FWM  259 rr
+        -> 10.0.1.5:0                   Masq    1      0          0
+        -> 10.0.1.6:0                   Masq    1      0          0
+        FWM  260 rr
+        -> 10.0.1.10:0                  Masq    1      0          0
+        有MARK 269的请求会负载均衡的转发到10.0.1.5和10.0.1.6，
+            即web的两个replica在自定义的my-swarm-net中的IP地址
