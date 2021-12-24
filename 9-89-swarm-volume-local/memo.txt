@@ -1,0 +1,52 @@
+这节的实验使用docker-compose.yml用来定义
+内容很简单
+    mysql的service，使用名为data的volume的路径保存数据
+    还有一个名为data的volume
+
+※ 清理一下作业环境后
+
+开始
+    启动stack
+    $ docker stack deploy --compose-file docker-compose.yml mysql-volume-demo
+    Creating network mysql-volume-demo_default
+    Creating service mysql-volume-demo_db
+
+    查看 stack ，ok
+    $ docker stack ls
+    NAME                SERVICES   ORCHESTRATOR
+    mysql-volume-demo   1          Swarm
+    
+    查看service ok
+    $ docker stack ps mysql-volume-demo
+    ID             NAME                     IMAGE       NODE            DESIRED STATE   CURRENT STATE            ERROR     PORTS
+    30zvivg21469   mysql-volume-demo_db.1   mysql:5.7   ip-10-0-2-253   Running         Running 44 seconds ago
+
+    连接一下mysql的DB，没有问题
+    $ docker exec -it mysql-volume-demo_db.1.30zvivg214691zqxpipvj5ipr  mysql -u root -p
+    Enter password:
+    Welcome to the MySQL monitor.  Commands end with ; or \g.
+    Your MySQL connection id is 2
+    Server version: 5.7.36 MySQL Community Server (GPL)
+
+    Copyright (c) 2000, 2021, Oracle and/or its affiliates.
+
+    Oracle is a registered trademark of Oracle Corporation and/or its
+    affiliates. Other names may be trademarks of their respective
+    owners.
+
+    Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+    mysql>
+
+
+在启动的service的replica的这个节点上，创建了一个volume，来保存mysql的数据，实现了数据的持久化
+    $ docker volume ls
+    DRIVER    VOLUME NAME
+    local     mysql-volume-demo_data
+    
+但是要注意，这里的volume的类型，为 local
+也就是说，这个volume是只供本节点上的service使用的，
+如果查看别的没有启动服务的节点，也并不会有这个volume
+
+如果想要进一步的实现各个volume的共享，
+需要安装一下docker的文件共享等等的插件来进行使用
