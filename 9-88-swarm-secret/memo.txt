@@ -1,0 +1,117 @@
+对于密码等重要的信息，
+一般使用docker的secret功能
+
+※ 之前稍微提过，docker swarm启动的时候会自动的创建一个RAFT的数据库
+   做成的一些secret的信息，其实就是放在这个RAFT数据库里边
+
+创建secret
+    
+    方法一： 直接输入命令
+    
+        $ echo abc123 | docker secret create mysql_pass -
+        coleh2xghhwhu6y7vnlpppd41
+
+            注意这里需要用echo这种方式，直接在后边添加参数是不行的
+        
+        查看结果，成功
+        $ docker secret ls
+        ID                          NAME         DRIVER    CREATED         UPDATED
+        coleh2xghhwhu6y7vnlpppd41   mysql_pass             7 seconds ago   7 seconds ago
+
+        $ docker secret inspect mysql_pass
+        [
+            {
+                "ID": "jtzf4wjwdghmm5pcbnt39to19",
+                "Version": {
+                    "Index": 277
+                },
+                "CreatedAt": "2021-12-24T02:57:57.555481504Z",
+                "UpdatedAt": "2021-12-24T02:57:57.555481504Z",
+                "Spec": {
+                    "Name": "mysql_pass",
+                    "Labels": {}
+                }
+            }
+        ]
+        
+        然后删掉
+        $ docker secret rm mysql_pass
+        mysql_pass
+
+    方法二： 从文件读取
+        
+        准备一个secret用的文件
+        $ ls
+        mysql_pass.txt
+
+        $ cat mysql_pass.txt
+        abc123
+
+        然后读取文件，做成secret
+        $ docker secret create mysql_pass mysql_pass.txt
+        jtzf4wjwdghmm5pcbnt39to19
+        
+        查看一下，OK
+        $ docker secret ls
+        ID                          NAME         DRIVER    CREATED          UPDATED
+        jtzf4wjwdghmm5pcbnt39to19   mysql_pass             12 seconds ago   12 seconds ago
+
+
+这两种办法都有些问题
+    方法一：
+        相当于直接把密码写道了命令行里，
+        查看bash的history，就可以看到当时设定的密码
+        ※ 当然也可以事后把这个history删掉
+    方法二： 
+        准备了一个写着密码的明文文件，
+        有这个文件读取权限的人，都可以看到密码
+        ※ 可以在使用完后直接把这个文件删掉
+
+
+secret的使用
+    像这样
+    $ docker service create --name mysql-demo --secret mysql_pass --env MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_pass mysql:5.7
+    docker service create --name mysql-demo --secret mysql_pass --env MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_pass mysql:5.7
+    0dq2hwlvs9vhzlytvy6dlz6h8
+    overall progress: 1 out of 1 tasks
+    1/1: running
+    verify: Service converged
+
+    参数
+        --secret mysql_pass
+            加载mysql_pass这secret到service中
+        --env MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_pass
+            然后读取这个secret文件，设置为环境变量
+
+    从命令中也能看出，
+    加载后会在服务的容器内/run/secrets/路径下，生成一个文件
+
+并不是所有的image都支持上边的这种，从文件创建环境变量的方式
+    回避的方法就是自己写一个dockerfile，FROM你要用的镜像，然后进行一些的环境变量的操作
+
+
+最后
+    secret也可以在docker-compose.yml的文件中进行使用
+    
+    可以在services的部分，使用secrets:关键字，
+        指定service要加载的secreate
+
+    或者在直接在文件中使用secrets:
+        使用直径路径的文件来创建secret
+    
+    比如
+        version: "3.9"
+
+        services:
+        redis:
+            image: redis:latest
+            secrets:
+            - my_secret
+            - my_other_secret
+
+        secrets:
+        my_secret:
+            file: ./my_secret.txt
+    
+详情参照docker的官方doc
+https://docs.docker.com/compose/compose-file/compose-file-v3/#secrets
