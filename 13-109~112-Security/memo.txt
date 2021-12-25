@@ -1,0 +1,57 @@
+本章介绍
+    主要围绕docker的安全问题
+    如果看docker的层次结构，从外到里
+        host - container - image - Base image - app
+            其实重要性，越往外越重要，host被攻破了，基本就完蛋了
+        app
+            代码层级的漏洞，也不是本章的内容
+        base image
+            这里尽量使用官方认证的镜像
+            有些恶意的镜像，会在里边植入挖矿程序，占用我们运行时的计算资源
+        host
+            比如可以docker的root-less模式，来提高安全性
+
+
+docker-bench-security
+    Docker运行配置的扫描工具
+    源代码
+        https://github.com/docker/docker-bench-security
+    用法
+        直接把上边的 clone 到本地
+        执行 docker-bench-security.sh ，就会对本地正在运行中的容器进行扫描
+
+这种运行扫描的工具其实也很多
+可以看看他都扫描了什么，给出了那些意见，来方便我们学习怎样的构造才是安全的
+
+
+系统漏洞扫描
+    可以上 CVE https://cve.mitre.org/ ， 查看各种系统的漏洞
+
+    课程中介绍了工具 snyk ，有兴趣可以看看
+        网址 https://snyk.io/
+        可以关联github的账户，或者bitbucket的账户
+        可以免费扫描自己的代码，会扫描dockerfile等等，显示出系统会有那些漏洞
+
+    同时还介绍 trivy
+        网址 https://aquasecurity.github.io/trivy/v0.22.0/
+        按照说明安装之后
+        使用
+            linux可以直接命令行，trivy image [镜像名]，就可以扫描本地镜像的漏洞情况
+    
+            
+容器的运行监控
+    除了上边的静态的安全策略，还可以对进行动态安全策略
+    可以监控容器的运行状态（比如访问情况等等），来动态的调整，达到提高安全性的目的
+    
+    工具介绍
+        sysdig
+            收费的工具
+            是一个比较全面的监控工具，容器运行相关的监控也很多
+                比如可以记录network的访问信息，如果有人对prod环境的容器进行ssh的login，这些就会被记录下来，发出警告
+
+    log的收集
+        对于容器的log，进行收集分析，
+        也是动态安全策略的一种    
+        
+        
+
