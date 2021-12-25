@@ -1,0 +1,47 @@
+概要
+    本章主要演示了一种docker的CD/CI实现的方法
+    使用的CI/CD的工具是GitHub actions
+        是github官方提供的一个CD/CI的工具，
+        简介
+            https://www.ruanyifeng.com/blog/2019/09/getting-started-with-github-actions.html
+        官方文档（没中文）
+            https://docs.github.com/en/actions
+
+
+dockerhub自己的自动build的服务
+    位置
+        随便打开一个自己dockerhub上的镜像，点开
+        上边有一个build的地方，点进去就是自动构建的选项
+    收费
+        现在这个服务归到了dockerhub的pro用户才能使用
+        每个月好几刀的订阅
+    使用
+        可以设定关联指定github或者bitbucket账户，然后指定branch
+        一旦检测到了branch更新了，就会自动build
+            也可以手动触发构建
+        而且这个功能还不支持多架构
+            这个自动打出来就是linux/amd64架构
+
+使用github actions
+    简介
+        github提供的CI/CD（或者是说dev-ops）的工具
+        和gitlab的CI工具也很像，最像的可能是Azure的pipeline
+            他们都是使用 yml 文件的格式，来定义flow（pipeline）中的一些列jobs
+    快速入门
+        推荐使用 https://lab.github.com/ 上的实验
+            ※ 注意别搞错了，不是gitlab
+        连接如下，最简单的入门，helloworld
+            https://lab.github.com/githubtraining/github-actions:-hello-world
+            点开后，点start free course
+                然后会询问github的一些权限
+        这个实验是一个交互式的课程，非常好理解
+
+使用github actions构建docker镜像
+    源代码可以直接使用
+        https://github.com/xiaopeng163/flask-redis
+    
+
+
+        
+    
+    
