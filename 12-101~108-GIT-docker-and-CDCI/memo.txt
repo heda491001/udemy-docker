@@ -35,13 +35,59 @@ dockerhub自己的自动build的服务
             点开后，点start free course
                 然后会询问github的一些权限
         这个实验是一个交互式的课程，非常好理解
+    关于 marketplace 
+        github的开放服务，提供了各种开发使用的工具，
+            什么都有，QA的，code review的，CI/CD的工具
+        还提供了actions里边，别人已经写好的actions，
+            使用时只需要进行引用就可以了
+            方法
+                yml文件中
+                uses：[XXXXX]/[YYYY]@[版本号]
+            比如，快速入门里使用的，checkout代码，就是github官方的
+                uses: actions/checkout@v2
+
 
 使用github actions构建docker镜像
     源代码可以直接使用
         https://github.com/xiaopeng163/flask-redis
+    源代码直接是最终版的，分节的做了几个branch来分别看看
+        1. docker-build
+            只有image的build，完事之后image ls 查看结果
+        2. docker-build-push
+            build完之后，push到dokcerhub的仓库
+            这里需要使用到个人的dockerhub的账号和密码，当然是不可以写道文件里的
+            github actions提供使用secrets的功能
+                设定位置，就是当前的repos点开，上边的setting里边，可以找到secret的选项
+                在其中添加需要用的用户名和密码，github actions就可以使用
+                而且这里推荐不要直接使用密码
+                    而是在dockerhub的上，在 account setting -> security 里
+                    获取一个login的token，来当作密码使用
+                        甚至可以设置这个token的权限，但是要付费（服了）
+        3. docker-buildx-push-multi
+            构建多架构的镜像，push到dockerhub
+            直接使用docker buildx可能会出现问题
+                可能会显示缺少que 这个插件，这个插件就是用来模拟各种架构用的
+            这里使用marketplace里提供的工具
+                添加QEMU的工具(这个也使用docker提供的就行)
+                使用docker官方提供的工具，setup我们的buildx
+        4. docker-build-push-final
+            进一步改造workflow
+            尽可能多的使用marketplace中已经写好的actions
+
+
+补充
+    最后补充练习
+    使用 github actions 来构建，发布一个自己的docker.tips的网站服务
+    源码
+        https://github.com/xiaopeng163/docker.tips
+    说明
+        build的部分
+            跟上边的内容差不多
+        deploy的部分
+            定义里
+                needs: build，也就是deploy需要在build完事之后再进行
+            使用了一个ansible的工具，自行学习
     
 
-
-        
     
     
