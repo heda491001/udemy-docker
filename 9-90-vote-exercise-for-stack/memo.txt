@@ -1,0 +1,103 @@
+
+和compose一样，最后来运行一下下面的vote练习
+
+    docker compose 投票 app 练习
+    源码地址： https://github.com/dockersamples/example-voting-app
+
+app的构成就不在赘述了
+
+这里注意一下要在使用stack的时候使用 docker-stack.yml 这个文件
+
+可以注意一下其中的deploy关键字
+    ......
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels: [APP=VOTING]
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints: [node.role == manager]
+    ......
+
+    可以设定比如
+        replicas 
+            -> 启动该多少个replica
+        restart_policy 
+            -> 什么情况下，直接重启容器
+        placement 
+            -> 希望部署的node有什么要求（比如例子中就要求必须要在manager节点上部署）
+
+
+运行，发现不好使，结果没反应上去
+    然后依次查看container的logs，可以发现保存投票最终结果的这个PostgreSQL有问题
+    ....
+    FATAL:  password authentication failed for user "postgres"
+    DETAIL:  Connection matched pg_hba.conf line 95: "host all all all md5"
+    ....
+
+查看issue
+    下边的连接
+    https://github.com/dockersamples/example-voting-app/issues/193
+
+    更改我们的docker-stack.yml的设定文件
+      db:
+        image: postgres:9.4
+        environment:
+        POSTGRES_USER: "postgres"
+        POSTGRES_PASSWORD: "postgres"
+        POSTGRES_HOST_AUTH_METHOD: "trust"      # 主要是加这个地方
+        volumes:
+        - db-data:/var/lib/postgresql/data
+
+修改完设定以后，直接再次deploy即可
+    注意我们的usage里边，
+        deploy不仅可以start新的stack
+        还可以update已经存在的stack
+
+        $ docker  stack --help
+
+        Usage:  docker stack [OPTIONS] COMMAND
+
+        Manage Docker stacks
+
+        Options:
+            --orchestrator string   Orchestrator to use (swarm|kubernetes|all)
+
+        Commands:
+        deploy      Deploy a new stack or update an existing stack
+        ls          List stacks
+        ps          List the tasks in the stack
+        rm          Remove one or more stacks
+        services    List the services in the stack
+
+        Run 'docker stack COMMAND --help' for more information on a command.
+
+
+update，还是不好使，接着查
+    发现service里的worker已经不再是waiting for DB了
+    说明postgres的启动可能已经ok了，但是
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    | System.AggregateException: One or more errors occurred. (No such device or address) ---> System.Net.Internals.SocketExceptionFactory+ExtendedSocketException: No such device or address
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Net.Dns.HostResolutionEndHelper(IAsyncResult asyncResult)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Net.Dns.EndGetHostAddresses(IAsyncResult asyncResult)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Net.Dns.<>c.<GetHostAddressesAsync>b__14_1(IAsyncResult asyncResult)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Threading.Tasks.TaskFactory`1.FromAsyncCoreLogic(IAsyncResult iar, Func`2 endFunction, Action`1 endAction, Task`1 promise, Boolean requiresSynchronization)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    --- End of inner exception stack trace ---
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Threading.Tasks.Task`1.GetResultCore(Boolean waitCompletionNotification)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at Npgsql.NpgsqlConnector.Connect(NpgsqlTimeout timeout)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at Npgsql.NpgsqlConnector.RawOpen(NpgsqlTimeout timeout)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at Npgsql.NpgsqlConnector.Open(NpgsqlTimeout timeout)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at Npgsql.ConnectorPool.Allocate(NpgsqlConnection conn, NpgsqlTimeout timeout)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at Npgsql.NpgsqlConnection.OpenInternal()
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at Worker.Program.OpenDbConnection(String connectionString) in /code/src/Worker/Program.cs:line 74
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at Worker.Program.Main(String[] args) in /code/src/Worker/Program.cs:line 19
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    | ---> (Inner Exception #0) System.Net.Internals.SocketExceptionFactory+ExtendedSocketException: No such device or address
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Net.Dns.HostResolutionEndHelper(IAsyncResult asyncResult)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Net.Dns.EndGetHostAddresses(IAsyncResult asyncResult)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Net.Dns.<>c.<GetHostAddressesAsync>b__14_1(IAsyncResult asyncResult)
+    vote_worker.1.hxz059g0h74c@ip-10-0-2-197    |    at System.Threading.Tasks.TaskFactory`1.FromAsyncCoreLogic(IAsyncResult iar, Func`2 endFunction, Action`1 endAction, Task`1 promise, Boolean requiresSynchronization)<---
+    
+    出现了一些认证上的错误

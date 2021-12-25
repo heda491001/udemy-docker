@@ -1,0 +1,62 @@
+基本上引用了docker.tips的原文
+https://dockertips.readthedocs.io/en/latest/docker-podman/podman-intro.html
+
+What is Podman?
+    Podman 是一个基于 Linux 系统的 daemon-less 的容器引擎。 
+    可以用来开发，管理和运行 OCI 标准的容器. 
+    podman可以运行在root或者非root用户模式。
+
+    Podman 是 Red Hat 在2018年推出的，源代码开放。
+
+    官方网站 https://podman.io/
+
+OCI https://opencontainers.org/
+
+podman 和 docker 的区别
+    最主要的区别是podman是Daemonless的，
+        docker的运行容器时候,需要在后台启动docker-daemon
+            可以通过ps命令查看所有进程，找到这个
+            而podman就没有这个东西
+        也以为这podman比docker更为的轻量级
+    podman不需要使用root用户或者root权限，所以更安全。
+    podman可以创建pod，pod的概念和Kubernetes 里定义的pod类似
+    podman运行把镜像和容器存储在不同的地方，但是docker必须存储在docker engineer所在的本地
+    podman是传统的fork-exec 模式，而docker是 client-server 架构
+        运行容器的时候docker引擎是host,
+        之前学习的操作,cli其实是一个docker的client,连接到这个运行的host
+
+
+podman的使用
+    镜像的拉取稍有区别
+        ※ docker直接pull就可以，会从dockerhub上拉取镜像
+        podman需要自己指定拉取的源
+            可以是dockerhub，也可以是quay（redhat自己的源）
+            可以通过一些registry指定默认的源
+        可以使用 podman search [镜像名] 来搜索想要的镜像
+        比如
+            podman image pull docker.io/library/nginx
+                拉取dockerhub的nginx 
+
+    其他基本上和docker没有任何区别
+        docker命令的docker换成podman，都能用
+
+
+pod
+    pod相比比docker的一个强项之一
+    podman的pod概念基本和k8s的pod一样
+        可以创建pod，可以将几个容器放在一个pod里面
+        同一个pod里边的所有容器，都共享一套命名空间，也包括网络，volume
+            这样的同一个pod里容器的相互通通信，直接使用 localhost：port 就可以，而不需要再添加网络
+        也可以理解成pod的容器，就相当于装在同一个机器上的几个程序
+
+root
+    docker的非root模式
+        docker需要root用户来运行docker-daemon
+            运行docker的容器也需要在root的组里边（要确认？）
+        同时docker自己也推出了rootless的模式，可以上官方文档上查阅
+            需要一些设定
+            使用后docker的daemon就会以指定用户，而不是root
+
+    podman就没有这种要求，理论上比docker的安全性要好
+        注意
+            不同的user使用podman后，镜像，执行的容器，都是不通用的（相互看不到的）

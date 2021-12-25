@@ -1,0 +1,92 @@
+本章主要是Docker 的多架构支持
+    这里的架构，指的是cpu架构，而不是操作系统或者别的架构
+    主要的也就两类
+        intel的 x86 架构
+            不多赘述，现在使用的绝大多数PC都是
+            AMD的也是 x86 架构
+        ARM 架构
+            主要是用在移动端
+                高通，华为，苹果，三星的手机芯片，都是ARM架构
+            由于苹果开始在自己的mac上使用ARM架构的M1芯片
+            之后ARM架构可能会更为广泛的被其他公司等采用
+            长期来看还是需要重视的
+
+首先
+    虽然之前一直没有考虑过架构的问题，但是
+        不同的架构，运行时需要的镜像是不一样的
+    docker hub
+        在从dockerhub拉取image的时候，会自动帮我们选择当前的机器的架构所要的镜像
+        实际上在dockerhub的网页查看，会发现同一个标签下边其实有很多镜像
+            其后便会跟着对应的cpu架构
+            当然也不是所有的镜像都支持所有的架构，这个也可以在docker hub上看到
+    如果是想自己制作镜像，在docker hub上分享给其他人，
+        那么最好还是进行一下多架构的支持
+
+关于多架构的镜像制作
+    以前的方式，直接docker build
+        x86 的机器打出来就是 x86 的镜像
+        ARM 的机器打出来就是 ARM 的镜像
+    而且
+        像下边这种做法
+            用 x86 的机器build一个 x86 的镜像，传到docker hub上
+            再用 ARM 的机器build一个 ARM 的镜像，用相同的标签传到docker hub上
+        则
+            后来传的 ARM 的镜像会直接把前边的覆盖
+            而不是像看到的一些官方镜像一样，同一个标签支持多版本
+    要制作多架构支持的镜像，有很多工具可供使用
+        buildx算是比较简单的一种
+
+
+buildx        
+    Windows和Mac的桌面版Docker自带buildx命令，
+    但是Linux环境下的Docker需要自行安装buildx
+        参考地址：https://github.com/docker/buildx
+
+    buildx的使用文档
+        https://docs.docker.com/buildx/working-with-buildx/
+
+    使用
+
+        首先 buildx ls ，确认一下现在自己的环境
+            PS C:\> docker buildx ls
+            NAME/NODE       DRIVER/ENDPOINT STATUS  PLATFORMS
+            desktop-linux   docker
+            desktop-linux desktop-linux   running linux/amd64, linux/arm64, linux/riscv64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v6
+            default *       docker
+            default       default         running linux/amd64, linux/arm64, linux/riscv64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v6
+                可以看到两个环境，因为使用的windows，一个是默认的，可能是wsl的？
+                想打多架构支持，是不能直接使用这里的默认的
+
+        重新创建一个新的环境       
+            PS C:\> docker buildx create --name mybuilder --use
+            mybuilder
+                这里的 --use 标签，就是创建完直接切过取
+            再看一下现在，切换到了mybuilder
+            PS C:\> docker buildx ls
+            NAME/NODE       DRIVER/ENDPOINT                STATUS   PLATFORMS
+            mybuilder *     docker-container
+            mybuilder0    npipe:////./pipe/docker_engine inactive
+            desktop-linux   docker
+            desktop-linux desktop-linux                  running  linux/amd64, linux/arm64, linux/riscv64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v6
+            default         docker
+            default       default                        running  linux/amd64, linux/arm64, linux/riscv64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v6
+
+        开始build
+            PS C:\> docker buildx build --push --platform linux/arm/v7,linux/arm64/v8,linux/amd64 -t [dockerhub的账号]/[image名]:[tag名] .
+                参数
+                    --push 
+                        构建完直接push到docker hub，（所以需要事先docker login）
+                    --platform 
+                        想要构建支持的平台
+                    -t 及后边
+                        和docker的build命令一样，设定包括tag，素材的path等等
+            
+        打完之后
+            本地docker image ls ，发现是没有镜像的，
+            这个多架构的镜像会直接的被push到远程，可以在dokcer hub的网页上看到
+    
+    补充
+        使用buildx，实际启动了一个容器，
+        buildx的一系列构筑实际都是在这个容器中进行
+        在本地查查看container ls就可以看到
+        使用结束后，可以rm掉这个容器
